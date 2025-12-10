@@ -75,6 +75,19 @@ public extension Harmonic {
         queueDeletions(for: records)
     }
 
+    func deleteAll<T>(of type: T.Type) async throws where T: HRecord {
+        _ = try await database.write { db in
+            try T.deleteAll(db)
+        }
+
+        let zoneID = CKRecordZone.ID(
+            zoneName: T.databaseTableName,
+            ownerName: CKCurrentUserDefaultName
+        )
+
+        syncEngine.state.add(pendingDatabaseChanges: [.deleteZone(zoneID), .saveZone(CKRecordZone(zoneID: zoneID))])
+    }
+
     /// Pushes all of the given record type to CloudKit
     /// This occurs regardless of changes.
     /// Sometimes used during migration for schema changes.
