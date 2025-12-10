@@ -251,25 +251,26 @@ private extension Harmonic {
 
     func handleFetchedDatabaseChanges(_ event: CKSyncEngine.Event.FetchedDatabaseChanges) {
         Logger.database.info("Handle fetched database changes \(event, privacy: .public)")
-
         // If a zone was deleted, we should delete everything for that zone locally.
-        #warning("Zone deletion is not handled!")
-        /* Copied from the example sync sample from Apple
-        var needsToSave = false
+
         for deletion in event.deletions {
-            switch deletion.zoneID.zoneName {
-            case Contact.zoneName:
-                self.appData.contacts = [:]
-                needsToSave = true
-            default:
-                Logger.database.info("Received deletion for unknown zone: \(deletion.zoneID)")
+            let type = modelTypes.first(where: { recordType in
+                deletion.zoneID.zoneName == recordType.recordType
+            })
+            
+            guard let type else {
+                Logger.database.info("Received deletion for unknown zone: \(deletion.zoneID.zoneName)")
+                continue
+            }
+            
+            Task {
+                do {
+                    try await deleteAll(of: type)
+                } catch {
+                    Logger.database.info("Unable to delete local records for deletion of zone \(deletion.zoneID.zoneName)")
+                }
             }
         }
-
-        if needsToSave {
-            try? self.persistLocalData() // This error should be handled, but we'll skip that for brevity in this sample app.
-        }
-         */
     }
 
     func handleFetchedRecordZoneChanges(_ event: CKSyncEngine.Event.FetchedRecordZoneChanges) {

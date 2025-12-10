@@ -85,7 +85,7 @@ public extension Harmonic {
             ownerName: CKCurrentUserDefaultName
         )
 
-        syncEngine.state.add(pendingDatabaseChanges: [.deleteZone(zoneID), .saveZone(CKRecordZone(zoneID: zoneID))])
+        syncEngine.state.add(pendingDatabaseChanges: [.deleteZone(zoneID)])
     }
 
     /// Pushes all of the given record type to CloudKit
