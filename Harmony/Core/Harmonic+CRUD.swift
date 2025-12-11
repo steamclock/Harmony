@@ -102,6 +102,12 @@ public extension Harmonic {
         }
 
         self.syncEngine.state.add(pendingRecordZoneChanges: pendingDeletions)
+        
+        #if DEBUG
+        Task {
+            try await sendChanges()
+        }
+        #endif
     }
 
     func sendChanges() async throws {

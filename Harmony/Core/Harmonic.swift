@@ -37,6 +37,12 @@ import Combine
 ///
 ///
 public final class Harmonic {
+    public enum SyncResult {
+        case success
+        case error(Set<CKError.Code>)
+    }
+
+    public let syncResult = PassthroughSubject<SyncResult, Never>()
 
     // Containers
     // Shared or private?
@@ -333,8 +339,12 @@ private extension Harmonic {
             }
         }
 
+        var occurredErrors: Set<CKError.Code> = []
+        
         // Handle any failed record saves.
         for failedRecordSave in event.failedRecordSaves {
+            occurredErrors.insert(failedRecordSave.error.code)
+
             let failedRecord = failedRecordSave.record
             guard let id = failedRecord.recordID.parsedRecordID,
                 let modelType = modelType(for: failedRecord) else {
@@ -404,6 +414,10 @@ private extension Harmonic {
         if !newPendingRecordZoneChanges.isEmpty {
             self.syncEngine.state.add(pendingRecordZoneChanges: newPendingRecordZoneChanges)
         }
+
+        syncResult.send(occurredErrors.isEmpty ? .success : .error(occurredErrors))
+
+        Logger.database.debug("Cloud sync completed.\n Successful writes: \(event.savedRecords.count)\n Failed writes: \(event.failedRecordSaves.count)")
     }
 }
 
