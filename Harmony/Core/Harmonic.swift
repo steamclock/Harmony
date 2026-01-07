@@ -9,7 +9,7 @@ import SwiftUI
 import CloudKit
 import os.log
 import GRDB
-import Combine
+@preconcurrency import Combine
 
 ///
 /// Harmony becomes your central repository.
@@ -42,6 +42,7 @@ public final class Harmonic {
         case error(Set<CKError.Code>)
     }
 
+    public let logPublisher = PassthroughSubject<(level: OSLogType, message: String), Never>()
     public let syncResult = PassthroughSubject<SyncResult, Never>()
 
     // Containers
@@ -175,7 +176,7 @@ private extension Harmonic {
         configuration.automaticallySync = true //self.automaticallySync
         let syncEngine = CKSyncEngine(configuration)
         _syncEngine = syncEngine
-        Logger.database.log("Initialized sync engine: \(syncEngine)")
+        log("Initialized sync engine: \(syncEngine)")
     }
 }
 
@@ -185,7 +186,8 @@ extension Harmonic: CKSyncEngineDelegate {
 
     public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
 
-        Logger.database.log("Handling event \(event, privacy: .public)")
+        log("Handling event \(event)")
+//        Logger.database.log("Handling event \(event, privacy: .public)")
 
         switch event {
         case .stateUpdate(let stateUpdate):
@@ -212,12 +214,14 @@ extension Harmonic: CKSyncEngineDelegate {
             break
 
         @unknown default:
-            Logger.database.info("Received unknown event: \(event)")
+            log("Received unknown event: \(event)", level: .info)
+//            Logger.database.info("Received unknown event: \(event)")
         }
     }
 
     public func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext, syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
-        Logger.database.info("Returning next record change batch for context: \(context.description, privacy: .public)")
+        log("Returning next record change batch for context: \(context.description)", level: .info)
+//        Logger.database.info("Returning next record change batch for context: \(context.description, privacy: .public)")
 
         let scope = context.options.scope
         let changes = syncEngine.state.pendingRecordZoneChanges.filter { scope.contains($0) }
@@ -252,11 +256,12 @@ extension Harmonic: CKSyncEngineDelegate {
 private extension Harmonic {
 
     func handleAccountChange(_ event: CKSyncEngine.Event.AccountChange) {
-        Logger.database.info("Handle account change \(event, privacy: .public)")
+        log("Handle account change \(event)", level: .info)
+//        Logger.database.info("Handle account change \(event, privacy: .public)")
     }
 
     func handleFetchedDatabaseChanges(_ event: CKSyncEngine.Event.FetchedDatabaseChanges) {
-        Logger.database.info("Handle fetched database changes \(event, privacy: .public)")
+        log("Handle fetched database changes \(event)", level: .info)
 
         // If a zone was deleted, we should delete everything for that zone locally.
         #warning("Zone deletion is not handled!")
@@ -279,7 +284,7 @@ private extension Harmonic {
     }
 
     func handleFetchedRecordZoneChanges(_ event: CKSyncEngine.Event.FetchedRecordZoneChanges) {
-        Logger.database.info("Handle fetched record zone changes \(event)")
+        log("Handle fetched record zone changes \(event)", level: .info)
 
         for modification in event.modifications {
             // The sync engine fetched a record, and we want to merge it into our local persistence.
@@ -321,7 +326,7 @@ private extension Harmonic {
     }
 
     func handleSentRecordZoneChanges(_ event: CKSyncEngine.Event.SentRecordZoneChanges) {
-        Logger.database.info("Handle sent record zone changes \(event, privacy: .public)")
+        log("Handle sent record zone changes \(event)", level: .info)
 
         // If we failed to save a record, we might want to retry depending on the error code.
         var newPendingRecordZoneChanges = [CKSyncEngine.PendingRecordZoneChange]()
@@ -358,7 +363,7 @@ private extension Harmonic {
                 // Let's merge the record from the server into our own local copy.
                 // The `mergeFromServerRecord` function takes care of the conflict resolution.
                 guard let serverRecord = failedRecordSave.error.serverRecord else {
-                    Logger.database.error("No server record for conflict \(failedRecordSave.error)")
+                    log("No server record for conflict \(failedRecordSave.error)", level: .error)
                     continue
                 }
 
@@ -389,12 +394,12 @@ private extension Harmonic {
 
             case .networkFailure, .networkUnavailable, .zoneBusy, .serviceUnavailable, .notAuthenticated, .operationCancelled:
                 // There are several errors that the sync engine will automatically retry, let's just log and move on.
-                Logger.database.debug("Retryable error saving \(failedRecord.recordID): \(failedRecordSave.error)")
+                log("Retryable error saving \(failedRecord.recordID): \(failedRecordSave.error)", level: .debug)
 
             default:
                 // We got an error, but we don't know what it is or how to handle it.
                 // If you have any sort of telemetry system, you should consider tracking this scenario so you can understand which errors you see in the wild.
-                Logger.database.fault("Unknown error saving record \(failedRecord.recordID): \(failedRecordSave.error)")
+                log("Unknown error saving record \(failedRecord.recordID): \(failedRecordSave.error)", level: .fault)
             }
 
             if shouldClearServerRecord {
@@ -417,7 +422,7 @@ private extension Harmonic {
 
         syncResult.send(occurredErrors.isEmpty ? .success : .error(occurredErrors))
 
-        Logger.database.debug("Cloud sync completed.\n Successful writes: \(event.savedRecords.count)\n Failed writes: \(event.failedRecordSaves.count)")
+        log("Cloud sync completed.\n Successful writes: \(event.savedRecords.count)\n Failed writes: \(event.failedRecordSaves.count)")
     }
 }
 

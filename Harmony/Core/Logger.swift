@@ -12,3 +12,9 @@ extension Logger {
 
     static let database = Logger(subsystem: Self.loggingSubsystem, category: "Database")
 }
+
+extension Harmonic {
+    func log(_ message: String, level: OSLogType = .default) {
+        logPublisher.send((level, message))
+    }
+}
