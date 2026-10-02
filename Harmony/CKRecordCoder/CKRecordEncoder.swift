@@ -50,10 +50,25 @@ public final class CKRecordEncoder {
       let context = EncodingError.Context(
         codingPath: [],
         debugDescription:
-          "CKRecord is too large. Record is \(formattedSize(ofDataCount: recordData.count)), the maxmimum allowed size is \(formattedSize(ofDataCount: maximumAllowedRecordSizeInBytes)))"
+          "CKRecord is too large. Record is \(formattedSize(ofDataCount: recordData.count)), the maxmimum allowed size is \(formattedSize(ofDataCount: maximumAllowedRecordSizeInBytes))). Largest fields: \(largestFields(in: recordKeyValues))"
       )
       throw EncodingError.invalidValue(Any.self, context)
     }
+  }
+
+  private func largestFields(in recordKeyValues: [String: CKRecordValue?], limit: Int = 3) -> String {
+    recordKeyValues
+      .compactMap { key, value -> (key: String, size: Int)? in
+        guard
+          let value,
+          let data = try? NSKeyedArchiver.archivedData(withRootObject: value, requiringSecureCoding: true)
+        else { return nil }
+        return (key, data.count)
+      }
+      .sorted { $0.size > $1.size }
+      .prefix(limit)
+      .map { "\($0.key) (\(formattedSize(ofDataCount: $0.size)))" }
+      .joined(separator: ", ")
   }
 
   private func formattedSize(ofDataCount dataCount: Int) -> String {

@@ -27,7 +27,7 @@ public protocol HRecord: CloudKitEncodable & CloudKitDecodable & FetchableRecord
     var zoneID: CKRecordZone.ID { get }
 
     var recordID: CKRecord.ID { get }
-    var record: CKRecord { get }
+    func encodeRecord() throws -> CKRecord
     
     var cloudKitLastModifiedDate: Date? { get }
     
@@ -67,6 +67,10 @@ extension HRecord {
             recordName: "\(Self.recordType)|\(id.uuidString)",
             zoneID: zoneID
         )
+    }
+
+    public func encodeRecord() throws -> CKRecord {
+        try CKRecordEncoder(zoneID: zoneID).encode(self)
     }
 
     public var cloudKitLastModifiedDate: Date? {

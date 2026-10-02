@@ -236,7 +236,13 @@ extension Harmonic: CKSyncEngineDelegate {
                         let uuid = UUID(uuidString: internalID)
                         return try modelType.fetchOne(db, key: uuid)
                 }) {
-                    return record.record
+                    do {
+                        return try record.encodeRecord()
+                    } catch {
+                        // Skip the record instead of crashing. It stays pending, so it is retried on the next send.
+                        log("Failed to encode record \(recordID.recordName), skipping it: \(error)", level: .error)
+                        return nil
+                    }
                 } else {
                     // Could be a deletion?
                     syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(recordID)])
