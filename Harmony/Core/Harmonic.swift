@@ -60,6 +60,7 @@ public final class Harmonic {
     }
 
     private let modelTypes: [any HRecord.Type]
+    private let encodeFailureTracker = EncodeFailureTracker()
     private let container: CKContainer
     private let userDefaults: UserDefaults
     let database: DatabaseWriter
@@ -236,7 +237,15 @@ extension Harmonic: CKSyncEngineDelegate {
                         let uuid = UUID(uuidString: internalID)
                         return try modelType.fetchOne(db, key: uuid)
                 }) {
-                    return record.record
+                    do {
+                        return try record.encodeRecord()
+                    } catch {
+                        // Skip the record instead of crashing. It stays pending, so it is retried on the next send.
+                        // Only the first failure per record and session is an error, to avoid one per send.
+                        let level: OSLogType = encodeFailureTracker.recordFailure(for: recordID) ? .error : .info
+                        log("Failed to encode record \(recordID.recordName), skipping it: \(error)", level: level)
+                        return nil
+                    }
                 } else {
                     // Could be a deletion?
                     syncEngine.state.remove(pendingRecordZoneChanges: [.saveRecord(recordID)])
