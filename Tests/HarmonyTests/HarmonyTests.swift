@@ -29,4 +29,14 @@ final class HarmonyTests: XCTestCase {
             XCTAssertTrue(context.debugDescription.contains("Largest fields: payload"))
         }
     }
+
+    func testEncodeFailureTrackerReportsOnlyFirstFailurePerRecord() {
+        let tracker = EncodeFailureTracker()
+        let first = CKRecord.ID(recordName: "TestRecord|1")
+        let second = CKRecord.ID(recordName: "TestRecord|2")
+
+        XCTAssertTrue(tracker.recordFailure(for: first))
+        XCTAssertFalse(tracker.recordFailure(for: first))
+        XCTAssertTrue(tracker.recordFailure(for: second))
+    }
 }
